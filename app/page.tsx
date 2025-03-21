@@ -70,7 +70,7 @@ export default function Home() {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <Music2 className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">MoodifyAI</span>
+            <span className="text-xl font-bold">Vibez</span>
           </div>
           <nav className="hidden md:flex items-center gap-6">
             <Link
@@ -129,7 +129,7 @@ export default function Home() {
                   Discover Music Based on Your Mood
                 </h1>
                 <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  MoodifyAI connects with your Spotify account to provide
+                  Vibez connects with your Spotify account to provide
                   personalized music recommendations based on your mood, powered
                   by AI.
                 </p>
@@ -237,8 +237,8 @@ export default function Home() {
                   Everything you need for a personalized music experience
                 </h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  MoodifyAI combines the power of Spotify with AI to create a
-                  unique music discovery experience.
+                  Vibez combines the power of Spotify with AI to create a unique
+                  music discovery experience.
                 </p>
               </div>
             </div>
@@ -264,7 +264,7 @@ export default function Home() {
       <footer className="border-t py-6 md:py-0">
         <div className="container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} MoodifyAI. All rights reserved.
+            &copy; {new Date().getFullYear()} Vibez. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <Link href="#" className="text-sm font-medium hover:underline">
