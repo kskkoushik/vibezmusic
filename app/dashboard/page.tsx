@@ -25,7 +25,6 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMobile } from "@/hooks/use-mobile";
-import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -214,7 +213,6 @@ const formatTime = (ms: number): string => {
 
 export default function Dashboard() {
   const isMobile = useMobile();
-  const { signOut } = useAuth();
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   //const [moodSearch, setMoodSearch] = useState("");
