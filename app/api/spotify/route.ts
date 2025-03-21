@@ -44,8 +44,10 @@ export async function POST(req: NextRequest) {
     console.log("Spotify API response:", data); // ✅ Debug Spotify response
 
     return NextResponse.json({ access_token: data.access_token });
-  } catch (error: any) {
-    console.error("API Error:", error.message); // ✅ Debug any internal errors
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    console.error("API Error:", errorMessage); // ✅ Debug any internal errors
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

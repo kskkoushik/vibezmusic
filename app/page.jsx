@@ -42,7 +42,7 @@ const redirectToAuthCodeFlow = async () => {
   window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
 };
 
-const generateCodeVerifier = (length: number) => {
+const generateCodeVerifier = (length) => {
   let text = "";
   const possible =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -52,7 +52,7 @@ const generateCodeVerifier = (length: number) => {
   return text;
 };
 
-const generateCodeChallenge = async (codeVerifier: string) => {
+const generateCodeChallenge = async (codeVerifier) => {
   const data = new TextEncoder().encode(codeVerifier);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
@@ -63,7 +63,7 @@ const generateCodeChallenge = async (codeVerifier: string) => {
 
 export default function Home() {
   const router = useRouter();
-  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
+  const [spotifyToken, setSpotifyToken] = (useState < string) | (null > null);
 
   return (
     <div className="flex flex-col min-h-screen">

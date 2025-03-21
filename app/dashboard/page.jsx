@@ -32,12 +32,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // Spotify API utility with improved error handling
 const spotifyApi = {
   base_url: "https://api.spotify.com/v1",
-  async makeRequest(
-    endpoint: string,
-    token: string,
-    method = "GET",
-    body: any = null
-  ) {
+  async makeRequest(endpoint, token, method = "GET", body = null) {
     try {
       console.log(`Making request to ${endpoint}`);
       const res = await fetch(`${spotifyApi.base_url}${endpoint}`, {
@@ -87,7 +82,7 @@ const spotifyApi = {
       // Safely parse JSON
       const text = await res.text();
       return text ? JSON.parse(text) : null;
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Spotify API request failed for ${endpoint}:`, error);
       throw error; // Re-throw to be caught in component
     }
@@ -130,7 +125,7 @@ const redirectToAuthCodeFlow = async () => {
   window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
 };
 
-const generateCodeVerifier = (length: number) => {
+const generateCodeVerifier = (length) => {
   let text = "";
   const possible =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -140,7 +135,7 @@ const generateCodeVerifier = (length: number) => {
   return text;
 };
 
-const generateCodeChallenge = async (codeVerifier: string) => {
+const generateCodeChallenge = async (codeVerifier) => {
   const data = new TextEncoder().encode(codeVerifier);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
@@ -157,16 +152,16 @@ export default function Dashboard() {
   const [moodSearch, setMoodSearch] = useState("");
   const [activeTab, setActiveTab] = useState("discover");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
   // Spotify user data
-  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<any | null>(null);
-  const [currentTrack, setCurrentTrack] = useState<any | null>(null);
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [recentlyPlayed, setRecentlyPlayed] = useState<any[]>([]);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [likedSongs, setLikedSongs] = useState<any[]>([]);
+  const [spotifyToken, setSpotifyToken] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [likedSongs, setLikedSongs] = useState([]);
   const [volume, setVolume] = useState(80);
   const [trackProgress, setTrackProgress] = useState(0);
   const [seeking, setSeeking] = useState(false);
@@ -174,9 +169,9 @@ export default function Dashboard() {
 
   // Spotify oEmbed
   const [showEmbed, setShowEmbed] = useState(false);
-  const [embedHtml, setEmbedHtml] = useState<string>("");
-  const [selectedTrack, setSelectedTrack] = useState<any | null>(null);
-  const embedRef = useRef<HTMLDivElement>(null);
+  const [embedHtml, setEmbedHtml] = useState("");
+  const [selectedTrack, setSelectedTrack] = useState(null);
+  const embedRef = useRef < HTMLDivElement > null;
 
   // Initialize Spotify token and fetch data
   useEffect(() => {
@@ -218,7 +213,7 @@ export default function Dashboard() {
           } else {
             throw new Error("No access token received from server");
           }
-        } catch (error: any) {
+        } catch (error) {
           setError(error.message);
           console.error("Error fetching access token:", error);
         } finally {
@@ -252,7 +247,7 @@ export default function Dashboard() {
       if (data) {
         setUserProfile(data);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching user profile:", error);
       if (error.message.includes("token expired")) {
         // Handle expired token
@@ -275,14 +270,12 @@ export default function Dashboard() {
         spotifyToken
       );
       if (data && data.devices && data.devices.length > 0) {
-        const activeDevice = data.devices.find(
-          (device: any) => device.is_active
-        );
+        const activeDevice = data.devices.find((device) => device.is_active);
         setHasActiveDevice(!!activeDevice);
       } else {
         setHasActiveDevice(false);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error checking for active devices:", error);
       setHasActiveDevice(false);
     }
@@ -312,7 +305,7 @@ export default function Dashboard() {
         setCurrentTrack(null);
         setIsPlaying(false);
       }
-    } catch (error: any) {
+    } catch (error) {
       // Don't set error on 404, as it's normal when nothing is playing
       if (!error.message.includes("404")) {
         console.error("Error fetching current track:", error);
@@ -332,7 +325,7 @@ export default function Dashboard() {
       if (data && data.items) {
         setPlaylists(data.items);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching playlists:", error);
     }
   }, [spotifyToken]);
@@ -347,9 +340,9 @@ export default function Dashboard() {
         spotifyToken
       );
       if (data && data.items) {
-        setRecentlyPlayed(data.items.map((item: any) => item.track));
+        setRecentlyPlayed(data.items.map((item) => item.track));
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching recently played tracks:", error);
     }
   }, [spotifyToken]);
@@ -368,11 +361,9 @@ export default function Dashboard() {
         );
 
         if (topArtists && topArtists.items && topArtists.items.length > 0) {
-          artistIds = topArtists.items
-            .map((artist: any) => artist.id)
-            .join(",");
+          artistIds = topArtists.items.map((artist) => artist.id).join(",");
         }
-      } catch (error: any) {
+      } catch (error) {
         console.warn(
           "Could not fetch top artists, using seed genres instead:",
           error
@@ -390,7 +381,7 @@ export default function Dashboard() {
       if (data && data.tracks) {
         setRecommendations(data.tracks);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching recommendations:", error);
 
       // Fallback to a different approach if recommendations fail
@@ -403,19 +394,17 @@ export default function Dashboard() {
 
         if (newReleases && newReleases.albums && newReleases.albums.items) {
           // Transform album objects to look more like track objects
-          const transformedTracks = newReleases.albums.items.map(
-            (album: any) => ({
-              id: album.id,
-              name: album.name,
-              artists: album.artists,
-              album: album,
-              type: "album",
-            })
-          );
+          const transformedTracks = newReleases.albums.items.map((album) => ({
+            id: album.id,
+            name: album.name,
+            artists: album.artists,
+            album: album,
+            type: "album",
+          }));
 
           setRecommendations(transformedTracks);
         }
-      } catch (fallbackError: any) {
+      } catch (fallbackError) {
         console.error("Even fallback recommendations failed:", fallbackError);
         // Don't set error state to avoid blocking the UI
       }
@@ -432,9 +421,9 @@ export default function Dashboard() {
         spotifyToken
       );
       if (data && data.items) {
-        setLikedSongs(data.items.map((item: any) => item.track));
+        setLikedSongs(data.items.map((item) => item.track));
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching liked songs:", error);
     }
   }, [spotifyToken]);
@@ -457,7 +446,7 @@ export default function Dashboard() {
 
       // Fetch current track after a short delay to update UI
       setTimeout(fetchCurrentTrack, 500);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error toggling play:", error);
       if (error.message.includes("NO_ACTIVE_DEVICE")) {
         setError(
@@ -469,7 +458,7 @@ export default function Dashboard() {
     }
   };
 
-  const skipTrack = async (direction: "next" | "previous") => {
+  const skipTrack = async (direction) => {
     if (!spotifyToken) return;
 
     try {
@@ -486,7 +475,7 @@ export default function Dashboard() {
 
       // Fetch current track after a delay to update UI
       setTimeout(fetchCurrentTrack, 500);
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error skipping to ${direction} track:`, error);
       if (error.message.includes("NO_ACTIVE_DEVICE")) {
         setError(
@@ -499,7 +488,7 @@ export default function Dashboard() {
   };
 
   // Volume control
-  const handleVolumeChange = async (newVolume: number[]) => {
+  const handleVolumeChange = async (newVolume) => {
     if (!spotifyToken) return;
     const volumePercent = newVolume[0];
     setVolume(volumePercent); // Update local state immediately for UI feedback
@@ -515,14 +504,14 @@ export default function Dashboard() {
         spotifyToken,
         "PUT"
       );
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error setting volume:", error);
       // Don't show error for volume changes as they're common
     }
   };
 
   // Track seeking
-  const handleSeek = async (newProgress: number[]) => {
+  const handleSeek = async (newProgress) => {
     if (!spotifyToken || !currentTrack) return;
     const seekPosition = newProgress[0];
     setTrackProgress(seekPosition); // Update local state
@@ -540,7 +529,7 @@ export default function Dashboard() {
         spotifyToken,
         "PUT"
       );
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error seeking track:", error);
       if (error.message.includes("NO_ACTIVE_DEVICE")) {
         setError(
@@ -555,7 +544,7 @@ export default function Dashboard() {
   };
 
   // Get Spotify oEmbed for a track
-  const getSpotifyEmbed = useCallback(async (track: any) => {
+  const getSpotifyEmbed = useCallback(async (track) => {
     if (!track || !track.id) {
       console.error("Invalid track object", track);
       return;
@@ -589,7 +578,7 @@ export default function Dashboard() {
       setShowEmbed(true);
 
       console.log("Spotify embed created for:", spotifyUri);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error setting up Spotify embed:", error);
       setError(
         `Could not load Spotify player for "${track.name}". Please try again.`
@@ -600,7 +589,7 @@ export default function Dashboard() {
   }, []);
 
   // Handle mood search
-  const handleMoodSearch = async (mood: string) => {
+  const handleMoodSearch = async (mood) => {
     if (!spotifyToken) return;
     setMoodSearch(mood);
     setLoading(true);
@@ -649,7 +638,7 @@ export default function Dashboard() {
       if (data && data.tracks) {
         setRecommendations(data.tracks);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Mood search failed:", error);
       // Try a fallback approach
       try {
@@ -724,7 +713,7 @@ export default function Dashboard() {
 
   // Update track progress in real-time when playing
   useEffect(() => {
-    let progressInterval: NodeJS.Timeout;
+    let progressInterval;
 
     if (isPlaying && currentTrack && !seeking) {
       progressInterval = setInterval(() => {
@@ -746,11 +735,8 @@ export default function Dashboard() {
 
   // Handle click outside of embed modal to close it
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        embedRef.current &&
-        !embedRef.current.contains(event.target as Node)
-      ) {
+    const handleClickOutside = (event) => {
+      if (embedRef.current && !embedRef.current.contains(event.target)) {
         setShowEmbed(false);
       }
     };
@@ -1076,7 +1062,7 @@ export default function Dashboard() {
               </div>
               <div className="text-xs text-muted-foreground">
                 {currentTrack?.artists
-                  ?.map((artist: any) => artist.name)
+                  ?.map((artist) => artist.name)
                   .join(", ") || " "}
               </div>
             </div>
@@ -1177,7 +1163,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold">{selectedTrack?.name}</h3>
               <p className="text-sm text-muted-foreground">
                 {selectedTrack?.artists
-                  ?.map((artist: any) => artist.name)
+                  ?.map((artist) => artist.name)
                   .join(", ")}
               </p>
             </div>
@@ -1194,22 +1180,14 @@ export default function Dashboard() {
 }
 
 // Format time for display
-const formatTime = (ms: number) => {
+const formatTime = (ms) => {
   if (isNaN(ms)) return "0:00"; // Handle invalid ms
   const minutes = Math.floor(ms / 60000);
   const seconds = Math.floor((ms % 60000) / 1000);
   return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 };
 
-function DiscoverContent({
-  recommendations,
-  recentlyPlayed,
-  getSpotifyEmbed,
-}: {
-  recommendations: any[];
-  recentlyPlayed: any[];
-  getSpotifyEmbed: (track: any) => void;
-}) {
+function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Good afternoon</h1>
@@ -1246,7 +1224,7 @@ function DiscoverContent({
               <div className="p-3">
                 <div className="font-medium truncate">{track.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {track.artists?.map((artist: any) => artist.name).join(", ")}
+                  {track.artists?.map((artist) => artist.name).join(", ")}
                 </div>
               </div>
             </motion.div>
@@ -1287,7 +1265,7 @@ function DiscoverContent({
               <div className="p-3">
                 <div className="font-medium truncate">{track.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {track.artists?.map((artist: any) => artist.name).join(", ")}
+                  {track.artists?.map((artist) => artist.name).join(", ")}
                 </div>
               </div>
             </motion.div>
@@ -1329,9 +1307,7 @@ function DiscoverContent({
                 <div className="p-3">
                   <div className="font-medium truncate">{track.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {track.artists
-                      ?.map((artist: any) => artist.name)
-                      .join(", ")}
+                    {track.artists?.map((artist) => artist.name).join(", ")}
                   </div>
                 </div>
               </motion.div>
@@ -1343,17 +1319,9 @@ function DiscoverContent({
   );
 }
 
-function SearchContent({
-  spotifyToken,
-  setRecommendations,
-  getSpotifyEmbed,
-}: {
-  spotifyToken: string | null;
-  setRecommendations: (tracks: any[]) => void;
-  getSpotifyEmbed: (track: any) => void;
-}) {
+function SearchContent(spotifyToken, setRecommendations, getSpotifyEmbed) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
@@ -1439,9 +1407,7 @@ function SearchContent({
                   <div className="p-3">
                     <div className="font-medium truncate">{track.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {track.artists
-                        ?.map((artist: any) => artist.name)
-                        .join(", ")}
+                      {track.artists?.map((artist) => artist.name).join(", ")}
                     </div>
                   </div>
                 </motion.div>
@@ -1507,7 +1473,7 @@ function SearchContent({
   );
 }
 
-function LibraryContent({ playlists }: { playlists: any[] }) {
+function LibraryContent(playlists) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Your Library</h1>
@@ -1591,13 +1557,7 @@ function LibraryContent({ playlists }: { playlists: any[] }) {
   );
 }
 
-function LikedContent({
-  likedSongs,
-  getSpotifyEmbed,
-}: {
-  likedSongs: any[];
-  getSpotifyEmbed: (track: any) => void;
-}) {
+function LikedContent(likedSongs, getSpotifyEmbed) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Liked Songs</h1>
@@ -1635,9 +1595,7 @@ function LikedContent({
                 <div className="p-3">
                   <div className="font-medium truncate">{track.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {track.artists
-                      ?.map((artist: any) => artist.name)
-                      .join(", ")}
+                    {track.artists?.map((artist) => artist.name).join(", ")}
                   </div>
                 </div>
               </motion.div>
@@ -1657,17 +1615,12 @@ function LikedContent({
   );
 }
 
-function AIMoodContent({
+function AIMoodContent(
   onMoodSearch,
   recommendations,
   setRecommendations,
-  getSpotifyEmbed,
-}: {
-  onMoodSearch: (mood: string) => void;
-  recommendations: any[];
-  setRecommendations: (tracks: any[]) => void;
-  getSpotifyEmbed: (track: any) => void;
-}) {
+  getSpotifyEmbed
+) {
   const [moodInput, setMoodInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -1762,9 +1715,7 @@ function AIMoodContent({
                   <div className="p-3">
                     <div className="font-medium truncate">{track.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {track.artists
-                        ?.map((artist: any) => artist.name)
-                        .join(", ")}
+                      {track.artists?.map((artist) => artist.name).join(", ")}
                     </div>
                   </div>
                 </motion.div>

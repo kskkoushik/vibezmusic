@@ -26,7 +26,14 @@
       }
     ]
   },
-  "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "app/dashboard/page.jsx",
+    "app/page.jsx"
+  ],
   "exclude": ["node_modules"],
   "typescript": {
     "ignoreBuildErrors": true
