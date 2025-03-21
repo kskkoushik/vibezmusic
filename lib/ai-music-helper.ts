@@ -1,5 +1,5 @@
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
 
 export async function generateMoodBasedRecommendations(mood: string) {
   try {
@@ -8,19 +8,24 @@ export async function generateMoodBasedRecommendations(mood: string) {
       prompt: `Generate a list of 8 songs that match the mood: ${mood}. 
               Format as JSON array with objects containing title, artist, and album.
               Be specific and varied in your recommendations.`,
-    })
+    });
 
     // Parse the AI response
-    return JSON.parse(text)
+    return JSON.parse(text);
   } catch (error) {
-    console.error("Error generating mood-based recommendations:", error)
-    throw new Error("Failed to generate recommendations")
+    console.error("Error generating mood-based recommendations:", error);
+    throw new Error("Failed to generate recommendations");
   }
 }
 
-export async function analyzeListeningHabits(tracks: any[]) {
+interface Track {
+  name: string;
+  artist: string;
+}
+
+export async function analyzeListeningHabits(tracks: Track[]) {
   try {
-    const tracksData = tracks.map((t) => `${t.name} by ${t.artist}`).join(", ")
+    const tracksData = tracks.map((t) => `${t.name} by ${t.artist}`).join(", ");
 
     const { text } = await generateText({
       model: openai("gpt-4o"),
@@ -34,13 +39,13 @@ export async function analyzeListeningHabits(tracks: any[]) {
                   "expand": ["artist3", "artist4"]
                 }
               }`,
-    })
+    });
 
     // Parse the AI response
-    return JSON.parse(text)
+    return JSON.parse(text);
   } catch (error) {
-    console.error("Error analyzing listening habits:", error)
-    throw new Error("Failed to analyze listening habits")
+    console.error("Error analyzing listening habits:", error);
+    throw new Error("Failed to analyze listening habits");
   }
 }
 
@@ -51,13 +56,12 @@ export async function generatePlaylist(theme: string, count = 10) {
       prompt: `Generate a themed playlist with ${count} songs for the theme: "${theme}".
               Format as JSON array with objects containing title, artist, and a short reason why it fits the theme.
               Be creative and diverse in your selections.`,
-    })
+    });
 
     // Parse the AI response
-    return JSON.parse(text)
+    return JSON.parse(text);
   } catch (error) {
-    console.error("Error generating playlist:", error)
-    throw new Error("Failed to generate playlist")
+    console.error("Error generating playlist:", error);
+    throw new Error("Failed to generate playlist");
   }
 }
-
