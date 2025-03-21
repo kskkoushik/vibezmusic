@@ -1,8 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Music2, Search, Sparkles } from "lucide-react";
-import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import { Music2, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -42,7 +41,7 @@ const redirectToAuthCodeFlow = async () => {
   window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
 };
 
-const generateCodeVerifier = (length) => {
+const generateCodeVerifier = (length: number) => {
   let text = "";
   const possible =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -52,10 +51,10 @@ const generateCodeVerifier = (length) => {
   return text;
 };
 
-const generateCodeChallenge = async (codeVerifier) => {
+const generateCodeChallenge = async (codeVerifier: string) => {
   const data = new TextEncoder().encode(codeVerifier);
   const digest = await crypto.subtle.digest("SHA-256", data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+  return btoa(String.fromCharCode(...Array.from(new Uint8Array(digest))))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -63,7 +62,7 @@ const generateCodeChallenge = async (codeVerifier) => {
 
 export default function Home() {
   const router = useRouter();
-  const [spotifyToken, setSpotifyToken] = (useState < string) | (null > null);
+  const [spotifyToken] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col min-h-screen">

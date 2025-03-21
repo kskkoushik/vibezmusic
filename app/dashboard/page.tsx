@@ -29,10 +29,69 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Define types for Spotify API responses
+interface SpotifyImage {
+  url: string;
+  height: number;
+  width: number;
+}
+
+interface SpotifyArtist {
+  id: string;
+  name: string;
+}
+
+interface SpotifyAlbum {
+  id: string;
+  name: string;
+  images: SpotifyImage[];
+  artists: SpotifyArtist[];
+}
+
+interface SpotifyTrack {
+  id: string;
+  name: string;
+  artists: SpotifyArtist[];
+  album: SpotifyAlbum;
+  duration_ms: number;
+  type: string;
+}
+
+interface SpotifyPlaylist {
+  id: string;
+  name: string;
+  images: SpotifyImage[];
+  type: string;
+  tracks: {
+    total: number;
+  };
+}
+
+interface SpotifyUserProfile {
+  id: string;
+  display_name: string;
+  images: SpotifyImage[];
+  product: string;
+}
+
+interface SpotifyCurrentlyPlaying {
+  item: SpotifyTrack;
+  is_playing: boolean;
+  progress_ms: number;
+  device: {
+    volume_percent: number;
+  };
+}
+
 // Spotify API utility with improved error handling
 const spotifyApi = {
   base_url: "https://api.spotify.com/v1",
-  async makeRequest(endpoint, token, method = "GET", body = null) {
+  async makeRequest(
+    endpoint: string,
+    token: string,
+    method = "GET",
+    body: Record<string, unknown> | null = null
+  ): Promise<unknown> {
     try {
       console.log(`Making request to ${endpoint}`);
       const res = await fetch(`${spotifyApi.base_url}${endpoint}`, {
@@ -66,6 +125,7 @@ const spotifyApi = {
         try {
           const errorText = await res.text();
           errorData = errorText ? JSON.parse(errorText) : null;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (parseError) {
           errorData = res.statusText || `Status: ${res.status}`;
         }
@@ -82,7 +142,7 @@ const spotifyApi = {
       // Safely parse JSON
       const text = await res.text();
       return text ? JSON.parse(text) : null;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Spotify API request failed for ${endpoint}:`, error);
       throw error; // Re-throw to be caught in component
     }
@@ -92,7 +152,7 @@ const spotifyApi = {
 const clientId = "2f1116716c70466d86841e0433d4c25d";
 const redirectUri = "http://localhost:3000/dashboard"; // Make sure this matches your actual redirect URI
 
-const redirectToAuthCodeFlow = async () => {
+const redirectToAuthCodeFlow = async (): Promise<void> => {
   const verifier = generateCodeVerifier(128);
   const challenge = await generateCodeChallenge(verifier);
 
@@ -125,7 +185,7 @@ const redirectToAuthCodeFlow = async () => {
   window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
 };
 
-const generateCodeVerifier = (length) => {
+const generateCodeVerifier = (length: number): string => {
   let text = "";
   const possible =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -135,13 +195,21 @@ const generateCodeVerifier = (length) => {
   return text;
 };
 
-const generateCodeChallenge = async (codeVerifier) => {
+const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
   const data = new TextEncoder().encode(codeVerifier);
   const digest = await crypto.subtle.digest("SHA-256", data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+  return btoa(String.fromCharCode(...Array.from(new Uint8Array(digest))))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
+};
+
+// Format time for display
+const formatTime = (ms: number): string => {
+  if (isNaN(ms)) return "0:00"; // Handle invalid ms
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 };
 
 export default function Dashboard() {
@@ -149,19 +217,21 @@ export default function Dashboard() {
   const { signOut } = useAuth();
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [moodSearch, setMoodSearch] = useState("");
+  //const [moodSearch, setMoodSearch] = useState("");
   const [activeTab, setActiveTab] = useState("discover");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Spotify user data
-  const [spotifyToken, setSpotifyToken] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [currentTrack, setCurrentTrack] = useState(null);
-  const [playlists, setPlaylists] = useState([]);
-  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [likedSongs, setLikedSongs] = useState([]);
+  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<SpotifyUserProfile | null>(
+    null
+  );
+  const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
+  const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<SpotifyTrack[]>([]);
+  const [recommendations, setRecommendations] = useState<SpotifyTrack[]>([]);
+  const [likedSongs, setLikedSongs] = useState<SpotifyTrack[]>([]);
   const [volume, setVolume] = useState(80);
   const [trackProgress, setTrackProgress] = useState(0);
   const [seeking, setSeeking] = useState(false);
@@ -169,9 +239,9 @@ export default function Dashboard() {
 
   // Spotify oEmbed
   const [showEmbed, setShowEmbed] = useState(false);
-  const [embedHtml, setEmbedHtml] = useState("");
-  const [selectedTrack, setSelectedTrack] = useState(null);
-  const embedRef = useRef < HTMLDivElement > null;
+  const [embedHtml, setEmbedHtml] = useState<string>("");
+  const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(null);
+  const embedRef = useRef<HTMLDivElement>(null);
 
   // Initialize Spotify token and fetch data
   useEffect(() => {
@@ -196,7 +266,7 @@ export default function Dashboard() {
             try {
               errorData = errorText ? JSON.parse(errorText) : null;
             } catch (e) {
-              errorData = { error_description: errorText || "Unknown error" };
+              errorData = { error_description: e || "Unknown error" };
             }
             throw new Error(
               errorData?.error_description || "Failed to fetch access token"
@@ -213,8 +283,10 @@ export default function Dashboard() {
           } else {
             throw new Error("No access token received from server");
           }
-        } catch (error) {
-          setError(error.message);
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+          setError(errorMessage);
           console.error("Error fetching access token:", error);
         } finally {
           setLoading(false);
@@ -245,17 +317,19 @@ export default function Dashboard() {
     try {
       const data = await spotifyApi.makeRequest("/me", spotifyToken);
       if (data) {
-        setUserProfile(data);
+        setUserProfile(data as SpotifyUserProfile);
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error fetching user profile:", error);
-      if (error.message.includes("token expired")) {
+      if (errorMessage.includes("token expired")) {
         // Handle expired token
         localStorage.removeItem("spotify_token");
         setSpotifyToken(null);
         setError("Spotify session expired. Please reconnect.");
       } else {
-        setError(error.message);
+        setError(errorMessage);
       }
     }
   }, [spotifyToken]);
@@ -269,13 +343,19 @@ export default function Dashboard() {
         "/me/player/devices",
         spotifyToken
       );
-      if (data && data.devices && data.devices.length > 0) {
-        const activeDevice = data.devices.find((device) => device.is_active);
+      if (
+        data &&
+        (data as { devices: { is_active: boolean }[] }).devices &&
+        (data as { devices: { is_active: boolean }[] }).devices.length > 0
+      ) {
+        const activeDevice = (
+          data as { devices: { is_active: boolean }[] }
+        ).devices.find((device: { is_active: boolean }) => device.is_active);
         setHasActiveDevice(!!activeDevice);
       } else {
         setHasActiveDevice(false);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error checking for active devices:", error);
       setHasActiveDevice(false);
     }
@@ -291,13 +371,16 @@ export default function Dashboard() {
         spotifyToken
       );
 
-      if (data && data.item) {
-        setCurrentTrack(data.item);
-        setIsPlaying(data.is_playing);
-        if (data.device) {
-          setVolume(data.device.volume_percent || 80);
+      if (data && (data as SpotifyCurrentlyPlaying).item) {
+        const currentlyPlaying = data as SpotifyCurrentlyPlaying;
+        setCurrentTrack(currentlyPlaying.item);
+        setIsPlaying(currentlyPlaying.is_playing);
+        if ((data as SpotifyCurrentlyPlaying).device) {
+          setVolume(
+            (data as SpotifyCurrentlyPlaying).device.volume_percent || 80
+          );
         }
-        setTrackProgress(data.progress_ms);
+        setTrackProgress((data as SpotifyCurrentlyPlaying).progress_ms);
       } else if (data === null) {
         // No track playing, but don't reset if we're just polling
         // This prevents UI flicker when nothing has changed
@@ -305,9 +388,11 @@ export default function Dashboard() {
         setCurrentTrack(null);
         setIsPlaying(false);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Don't set error on 404, as it's normal when nothing is playing
-      if (!error.message.includes("404")) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      if (!errorMessage.includes("404")) {
         console.error("Error fetching current track:", error);
       }
     }
@@ -322,10 +407,10 @@ export default function Dashboard() {
         "/me/playlists?limit=10",
         spotifyToken
       );
-      if (data && data.items) {
-        setPlaylists(data.items);
+      if (data && (data as { items: SpotifyPlaylist[] }).items) {
+        setPlaylists((data as { items: SpotifyPlaylist[] }).items);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching playlists:", error);
     }
   }, [spotifyToken]);
@@ -339,10 +424,14 @@ export default function Dashboard() {
         "/me/player/recently-played?limit=6",
         spotifyToken
       );
-      if (data && data.items) {
-        setRecentlyPlayed(data.items.map((item) => item.track));
+      if (data && (data as { items: unknown[] }).items) {
+        setRecentlyPlayed(
+          (data as { items: { track: SpotifyTrack }[] }).items.map(
+            (item: { track: SpotifyTrack }) => item.track
+          )
+        );
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching recently played tracks:", error);
     }
   }, [spotifyToken]);
@@ -360,10 +449,16 @@ export default function Dashboard() {
           spotifyToken
         );
 
-        if (topArtists && topArtists.items && topArtists.items.length > 0) {
-          artistIds = topArtists.items.map((artist) => artist.id).join(",");
+        if (
+          topArtists &&
+          (topArtists as { items: unknown[] }).items &&
+          (topArtists as { items: unknown[] }).items.length > 0
+        ) {
+          artistIds = (topArtists as { items: unknown[] }).items
+            .map((artist: { id: string }) => artist.id)
+            .join(",");
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn(
           "Could not fetch top artists, using seed genres instead:",
           error
@@ -378,10 +473,10 @@ export default function Dashboard() {
 
       const data = await spotifyApi.makeRequest(endpoint, spotifyToken);
 
-      if (data && data.tracks) {
-        setRecommendations(data.tracks);
+      if (data && (data as { tracks: SpotifyTrack[] }).tracks) {
+        setRecommendations((data as { tracks: SpotifyTrack[] }).tracks);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching recommendations:", error);
 
       // Fallback to a different approach if recommendations fail
@@ -392,19 +487,25 @@ export default function Dashboard() {
           spotifyToken
         );
 
-        if (newReleases && newReleases.albums && newReleases.albums.items) {
+        if (
+          newReleases &&
+          (newReleases as { albums?: { items: SpotifyAlbum[] } })?.albums?.items
+        ) {
           // Transform album objects to look more like track objects
-          const transformedTracks = newReleases.albums.items.map((album) => ({
+          const transformedTracks = (
+            newReleases as { albums: { items: SpotifyAlbum[] } }
+          ).albums.items.map((album: SpotifyAlbum) => ({
             id: album.id,
             name: album.name,
             artists: album.artists,
             album: album,
             type: "album",
+            duration_ms: 0, // Default value since albums don't have duration
           }));
 
           setRecommendations(transformedTracks);
         }
-      } catch (fallbackError) {
+      } catch (fallbackError: unknown) {
         console.error("Even fallback recommendations failed:", fallbackError);
         // Don't set error state to avoid blocking the UI
       }
@@ -420,10 +521,14 @@ export default function Dashboard() {
         "/me/tracks?limit=10",
         spotifyToken
       );
-      if (data && data.items) {
-        setLikedSongs(data.items.map((item) => item.track));
+      if (data && (data as { items: { track: SpotifyTrack }[] }).items) {
+        setLikedSongs(
+          (data as { items: { track: SpotifyTrack }[] }).items.map(
+            (item) => item.track
+          )
+        );
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching liked songs:", error);
     }
   }, [spotifyToken]);
@@ -446,19 +551,21 @@ export default function Dashboard() {
 
       // Fetch current track after a short delay to update UI
       setTimeout(fetchCurrentTrack, 500);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error toggling play:", error);
-      if (error.message.includes("NO_ACTIVE_DEVICE")) {
+      if (errorMessage.includes("NO_ACTIVE_DEVICE")) {
         setError(
           "No active Spotify device found. Please open Spotify on any device first."
         );
       } else {
-        setError(error.message);
+        setError(errorMessage);
       }
     }
   };
 
-  const skipTrack = async (direction) => {
+  const skipTrack = async (direction: "next" | "previous") => {
     if (!spotifyToken) return;
 
     try {
@@ -475,20 +582,22 @@ export default function Dashboard() {
 
       // Fetch current track after a delay to update UI
       setTimeout(fetchCurrentTrack, 500);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error(`Error skipping to ${direction} track:`, error);
-      if (error.message.includes("NO_ACTIVE_DEVICE")) {
+      if (errorMessage.includes("NO_ACTIVE_DEVICE")) {
         setError(
           "No active Spotify device found. Please open Spotify on any device first."
         );
       } else {
-        setError(error.message);
+        setError(errorMessage);
       }
     }
   };
 
   // Volume control
-  const handleVolumeChange = async (newVolume) => {
+  const handleVolumeChange = async (newVolume: number[]) => {
     if (!spotifyToken) return;
     const volumePercent = newVolume[0];
     setVolume(volumePercent); // Update local state immediately for UI feedback
@@ -504,14 +613,14 @@ export default function Dashboard() {
         spotifyToken,
         "PUT"
       );
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error setting volume:", error);
       // Don't show error for volume changes as they're common
     }
   };
 
   // Track seeking
-  const handleSeek = async (newProgress) => {
+  const handleSeek = async (newProgress: number[]) => {
     if (!spotifyToken || !currentTrack) return;
     const seekPosition = newProgress[0];
     setTrackProgress(seekPosition); // Update local state
@@ -529,14 +638,16 @@ export default function Dashboard() {
         spotifyToken,
         "PUT"
       );
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error seeking track:", error);
-      if (error.message.includes("NO_ACTIVE_DEVICE")) {
+      if (errorMessage.includes("NO_ACTIVE_DEVICE")) {
         setError(
           "No active Spotify device found. Please open Spotify on any device first."
         );
       } else {
-        setError(error.message);
+        setError(errorMessage);
       }
     } finally {
       setSeeking(false);
@@ -544,7 +655,7 @@ export default function Dashboard() {
   };
 
   // Get Spotify oEmbed for a track
-  const getSpotifyEmbed = useCallback(async (track) => {
+  const getSpotifyEmbed = useCallback(async (track: SpotifyTrack) => {
     if (!track || !track.id) {
       console.error("Invalid track object", track);
       return;
@@ -578,7 +689,7 @@ export default function Dashboard() {
       setShowEmbed(true);
 
       console.log("Spotify embed created for:", spotifyUri);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error setting up Spotify embed:", error);
       setError(
         `Could not load Spotify player for "${track.name}". Please try again.`
@@ -589,9 +700,9 @@ export default function Dashboard() {
   }, []);
 
   // Handle mood search
-  const handleMoodSearch = async (mood) => {
+  const handleMoodSearch = async (mood: string) => {
     if (!spotifyToken) return;
-    setMoodSearch(mood);
+    //setMoodSearch(mood);
     setLoading(true);
 
     // Use Spotify recommendation API with valence parameter
@@ -635,10 +746,11 @@ export default function Dashboard() {
         spotifyToken
       );
 
-      if (data && data.tracks) {
-        setRecommendations(data.tracks);
+      const result = data as { tracks?: SpotifyTrack[] };
+      if (result.tracks) {
+        setRecommendations(result.tracks);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Mood search failed:", error);
       // Try a fallback approach
       try {
@@ -651,10 +763,13 @@ export default function Dashboard() {
 
         if (
           searchResults &&
-          searchResults.tracks &&
-          searchResults.tracks.items
+          (searchResults as { tracks?: { items: SpotifyTrack[] } }).tracks &&
+          (searchResults as { tracks?: { items: SpotifyTrack[] } }).tracks.items
         ) {
-          setRecommendations(searchResults.tracks.items);
+          setRecommendations(
+            (searchResults as { tracks?: { items: SpotifyTrack[] } }).tracks
+              .items
+          );
         }
       } catch (fallbackError) {
         console.error("Fallback mood search failed:", fallbackError);
@@ -713,14 +828,14 @@ export default function Dashboard() {
 
   // Update track progress in real-time when playing
   useEffect(() => {
-    let progressInterval;
+    let progressInterval: NodeJS.Timeout | undefined;
 
     if (isPlaying && currentTrack && !seeking) {
       progressInterval = setInterval(() => {
         setTrackProgress((prev) => {
           // If we reach the end of the track, don't increment further
           if (prev >= currentTrack.duration_ms) {
-            clearInterval(progressInterval);
+            if (progressInterval) clearInterval(progressInterval);
             return prev;
           }
           return prev + 1000; // Increment by 1 second
@@ -735,8 +850,11 @@ export default function Dashboard() {
 
   // Handle click outside of embed modal to close it
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (embedRef.current && !embedRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        embedRef.current &&
+        !embedRef.current.contains(event.target as Node)
+      ) {
         setShowEmbed(false);
       }
     };
@@ -1062,7 +1180,7 @@ export default function Dashboard() {
               </div>
               <div className="text-xs text-muted-foreground">
                 {currentTrack?.artists
-                  ?.map((artist) => artist.name)
+                  ?.map((artist: SpotifyArtist) => artist.name)
                   .join(", ") || " "}
               </div>
             </div>
@@ -1163,7 +1281,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold">{selectedTrack?.name}</h3>
               <p className="text-sm text-muted-foreground">
                 {selectedTrack?.artists
-                  ?.map((artist) => artist.name)
+                  ?.map((artist: SpotifyArtist) => artist.name)
                   .join(", ")}
               </p>
             </div>
@@ -1179,15 +1297,16 @@ export default function Dashboard() {
   );
 }
 
-// Format time for display
-const formatTime = (ms) => {
-  if (isNaN(ms)) return "0:00"; // Handle invalid ms
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-};
-
-function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
+// Content components
+function DiscoverContent({
+  recommendations,
+  recentlyPlayed,
+  getSpotifyEmbed,
+}: {
+  recommendations: SpotifyTrack[];
+  recentlyPlayed: SpotifyTrack[];
+  getSpotifyEmbed: (track: SpotifyTrack) => void;
+}) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Good afternoon</h1>
@@ -1207,10 +1326,6 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
                 src={
                   track.album?.images?.[2]?.url ||
                   "/placeholder.svg?height=64&width=64" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
                   "/placeholder.svg"
                 }
                 alt={track.name}
@@ -1224,7 +1339,9 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
               <div className="p-3">
                 <div className="font-medium truncate">{track.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {track.artists?.map((artist) => artist.name).join(", ")}
+                  {track.artists
+                    ?.map((artist: SpotifyArtist) => artist.name)
+                    .join(", ")}
                 </div>
               </div>
             </motion.div>
@@ -1248,10 +1365,6 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
                 src={
                   track.album?.images?.[1]?.url ||
                   "/placeholder.svg?height=200&width=200" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
-                  "/placeholder.svg" ||
                   "/placeholder.svg"
                 }
                 alt={track.name}
@@ -1265,7 +1378,9 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
               <div className="p-3">
                 <div className="font-medium truncate">{track.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {track.artists?.map((artist) => artist.name).join(", ")}
+                  {track.artists
+                    ?.map((artist: SpotifyArtist) => artist.name)
+                    .join(", ")}
                 </div>
               </div>
             </motion.div>
@@ -1290,10 +1405,6 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
                   src={
                     track.album?.images?.[1]?.url ||
                     "/placeholder.svg?height=200&width=200" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
                     "/placeholder.svg"
                   }
                   alt={track.name}
@@ -1307,7 +1418,9 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
                 <div className="p-3">
                   <div className="font-medium truncate">{track.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {track.artists?.map((artist) => artist.name).join(", ")}
+                    {track.artists
+                      ?.map((artist: SpotifyArtist) => artist.name)
+                      .join(", ")}
                   </div>
                 </div>
               </motion.div>
@@ -1319,9 +1432,17 @@ function DiscoverContent(recommendations, recentlyPlayed, getSpotifyEmbed) {
   );
 }
 
-function SearchContent(spotifyToken, setRecommendations, getSpotifyEmbed) {
+function SearchContent({
+  spotifyToken,
+  setRecommendations,
+  getSpotifyEmbed,
+}: {
+  spotifyToken: string | null;
+  setRecommendations: (tracks: SpotifyTrack[]) => void;
+  getSpotifyEmbed: (track: SpotifyTrack) => void;
+}) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([]);
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
@@ -1329,12 +1450,12 @@ function SearchContent(spotifyToken, setRecommendations, getSpotifyEmbed) {
 
     setLoading(true);
     try {
-      const data = await spotifyApi.makeRequest(
+      const data = (await spotifyApi.makeRequest(
         `/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=20`,
         spotifyToken
-      );
+      )) as { tracks?: { items: SpotifyTrack[] } };
 
-      if (data && data.tracks && data.tracks.items) {
+      if (data.tracks && data.tracks.items) {
         setSearchResults(data.tracks.items);
         // Also update recommendations to show in other tabs
         setRecommendations(data.tracks.items);
@@ -1390,10 +1511,6 @@ function SearchContent(spotifyToken, setRecommendations, getSpotifyEmbed) {
                     src={
                       track.album?.images?.[1]?.url ||
                       "/placeholder.svg?height=200&width=200" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                     alt={track.name}
@@ -1407,7 +1524,9 @@ function SearchContent(spotifyToken, setRecommendations, getSpotifyEmbed) {
                   <div className="p-3">
                     <div className="font-medium truncate">{track.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {track.artists?.map((artist) => artist.name).join(", ")}
+                      {track.artists
+                        ?.map((artist: SpotifyArtist) => artist.name)
+                        .join(", ")}
                     </div>
                   </div>
                 </motion.div>
@@ -1473,7 +1592,7 @@ function SearchContent(spotifyToken, setRecommendations, getSpotifyEmbed) {
   );
 }
 
-function LibraryContent(playlists) {
+function LibraryContent({ playlists }: { playlists: SpotifyPlaylist[] }) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Your Library</h1>
@@ -1525,10 +1644,6 @@ function LibraryContent(playlists) {
                   src={
                     playlist.images?.[0]?.url ||
                     "/placeholder.svg?height=48&width=48" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
                     "/placeholder.svg"
                   }
                   alt={playlist.name}
@@ -1557,7 +1672,13 @@ function LibraryContent(playlists) {
   );
 }
 
-function LikedContent(likedSongs, getSpotifyEmbed) {
+function LikedContent({
+  likedSongs,
+  getSpotifyEmbed,
+}: {
+  likedSongs: SpotifyTrack[];
+  getSpotifyEmbed: (track: SpotifyTrack) => void;
+}) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Liked Songs</h1>
@@ -1578,10 +1699,6 @@ function LikedContent(likedSongs, getSpotifyEmbed) {
                   src={
                     track.album?.images?.[1]?.url ||
                     "/placeholder.svg?height=200&width=200" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
-                    "/placeholder.svg" ||
                     "/placeholder.svg"
                   }
                   alt={track.name}
@@ -1595,7 +1712,9 @@ function LikedContent(likedSongs, getSpotifyEmbed) {
                 <div className="p-3">
                   <div className="font-medium truncate">{track.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {track.artists?.map((artist) => artist.name).join(", ")}
+                    {track.artists
+                      ?.map((artist: SpotifyArtist) => artist.name)
+                      .join(", ")}
                   </div>
                 </div>
               </motion.div>
@@ -1615,12 +1734,16 @@ function LikedContent(likedSongs, getSpotifyEmbed) {
   );
 }
 
-function AIMoodContent(
+function AIMoodContent({
   onMoodSearch,
   recommendations,
-  setRecommendations,
-  getSpotifyEmbed
-) {
+  getSpotifyEmbed,
+}: {
+  onMoodSearch: (mood: string) => void;
+  recommendations: SpotifyTrack[];
+  setRecommendations: (tracks: SpotifyTrack[]) => void;
+  getSpotifyEmbed: (track: SpotifyTrack) => void;
+}) {
   const [moodInput, setMoodInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -1698,10 +1821,6 @@ function AIMoodContent(
                     src={
                       track.album?.images?.[1]?.url ||
                       "/placeholder.svg?height=200&width=200" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                     alt={track.name}
@@ -1715,7 +1834,9 @@ function AIMoodContent(
                   <div className="p-3">
                     <div className="font-medium truncate">{track.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {track.artists?.map((artist) => artist.name).join(", ")}
+                      {track.artists
+                        ?.map((artist: SpotifyArtist) => artist.name)
+                        .join(", ")}
                     </div>
                   </div>
                 </motion.div>
