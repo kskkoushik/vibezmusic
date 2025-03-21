@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const clientId = "2f1116716c70466d86841e0433d4c25d";
-const redirectUri = "http://localhost:3000/dashboard"; // Make sure this matches your actual redirect URI
+const redirectUri = "https://vibezmusic.vercel.app/dashboard"; // Make sure this matches your actual redirect URI
 
 const redirectToAuthCodeFlow = async () => {
   const verifier = generateCodeVerifier(128);

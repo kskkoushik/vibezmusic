@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const clientId = "2f1116716c70466d86841e0433d4c25d";
-const redirectUri = "http://localhost:3000/dashboard";
+const redirectUri = "https://vibezmusic.vercel.app/dashboard";
 
 export async function POST(req: NextRequest) {
   try {
