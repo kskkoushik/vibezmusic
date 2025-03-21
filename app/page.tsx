@@ -4,9 +4,66 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Music2, Search, Sparkles } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+const clientId = "2f1116716c70466d86841e0433d4c25d";
+const redirectUri = "http://localhost:3000/dashboard"; // Make sure this matches your actual redirect URI
+
+const redirectToAuthCodeFlow = async () => {
+  const verifier = generateCodeVerifier(128);
+  const challenge = await generateCodeChallenge(verifier);
+
+  // Save to localStorage
+  localStorage.setItem("verifier", verifier);
+
+  const params = new URLSearchParams();
+  params.append("client_id", clientId);
+  params.append("response_type", "code");
+  params.append("redirect_uri", redirectUri);
+  params.append(
+    "scope",
+    [
+      "user-read-private",
+      "user-read-email",
+      "user-library-read",
+      "user-read-currently-playing",
+      "user-read-recently-played",
+      "playlist-read-private",
+      "playlist-read-collaborative",
+      "user-top-read",
+      "user-modify-playback-state",
+      "user-read-playback-state",
+    ].join(" ")
+  );
+
+  params.append("code_challenge_method", "S256");
+  params.append("code_challenge", challenge);
+
+  window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+};
+
+const generateCodeVerifier = (length: number) => {
+  let text = "";
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+};
+
+const generateCodeChallenge = async (codeVerifier: string) => {
+  const data = new TextEncoder().encode(codeVerifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+};
 
 export default function Home() {
   const router = useRouter();
+  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -26,21 +83,22 @@ export default function Home() {
             <Link href="#about" className="text-sm font-medium hover:underline">
               About
             </Link>
-            <SignedIn>
+
+            {spotifyToken ? (
               <Button
-                onClick={() => {
-                  router.push("/dashboard");
-                }}
+                onClick={() => redirectToAuthCodeFlow()}
+                disabled={!!spotifyToken}
               >
                 Dashboard
               </Button>
-            </SignedIn>
-
-            <SignedOut>
-              <SignInButton forceRedirectUrl={"/dashboard"}>
-                <Button>Login with Spotify</Button>
-              </SignInButton>
-            </SignedOut>
+            ) : (
+              <Button
+                onClick={() => redirectToAuthCodeFlow()}
+                disabled={!!spotifyToken}
+              >
+                Sync With Spotify
+              </Button>
+            )}
           </nav>
           <Button variant="outline" size="icon" className="md:hidden">
             <span className="sr-only">Menu</span>
@@ -77,25 +135,24 @@ export default function Home() {
                   by AI.
                 </p>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <SignedOut>
-                    <SignInButton forceRedirectUrl={"/dashboard"}>
-                      <Button size="lg" className="w-full min-[400px]:w-auto">
-                        Get Started
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </SignInButton>
-                  </SignedOut>
-                  <SignedIn>
+                  {spotifyToken ? (
                     <Button
-                      onClick={() => {
-                        router.push("/dashboard");
-                      }}
+                      onClick={() => router.push("/dashboard")}
+                      disabled={!!spotifyToken}
                       className="w-full min-[400px]:w-auto"
                     >
-                      Listen Music
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      Dashboard
                     </Button>
-                  </SignedIn>
+                  ) : (
+                    <Button
+                      onClick={() => redirectToAuthCodeFlow()}
+                      disabled={!!spotifyToken}
+                      className="w-full min-[400px]:w-auto"
+                    >
+                      Get started
+                    </Button>
+                  )}
+
                   <Link href="#features">
                     <Button
                       size="lg"
@@ -114,7 +171,7 @@ export default function Home() {
                       <div className="w-[80%] h-[80%] bg-background/80 backdrop-blur-md rounded-lg p-6 flex flex-col gap-4">
                         <div className="flex items-center gap-2">
                           <Music2 className="h-6 w-6 text-primary" />
-                          <span className="text-xl font-bold">MoodifyAI</span>
+                          <span className="text-xl font-bold">Vibez</span>
                         </div>
                         <div className="flex-1 flex flex-col gap-4 overflow-hidden">
                           <div className="relative">
