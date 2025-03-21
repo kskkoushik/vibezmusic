@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +20,7 @@ import {
   SkipForward,
   Volume2,
   Loader2,
+  X,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -170,6 +171,12 @@ export default function Dashboard() {
   const [trackProgress, setTrackProgress] = useState(0);
   const [seeking, setSeeking] = useState(false);
   const [hasActiveDevice, setHasActiveDevice] = useState(false);
+
+  // Spotify oEmbed
+  const [showEmbed, setShowEmbed] = useState(false);
+  const [embedHtml, setEmbedHtml] = useState<string>("");
+  const [selectedTrack, setSelectedTrack] = useState<any | null>(null);
+  const embedRef = useRef<HTMLDivElement>(null);
 
   // Initialize Spotify token and fetch data
   useEffect(() => {
@@ -547,13 +554,50 @@ export default function Dashboard() {
     }
   };
 
-  // Format time for display
-  const formatTime = (ms: number) => {
-    if (isNaN(ms)) return "0:00"; // Handle invalid ms
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-  };
+  // Get Spotify oEmbed for a track
+  const getSpotifyEmbed = useCallback(async (track: any) => {
+    if (!track || !track.id) {
+      console.error("Invalid track object", track);
+      return;
+    }
+
+    setSelectedTrack(track);
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Check if it's an album or a track
+      const type = track.type || "track";
+
+      // Create the embed HTML directly instead of fetching from oEmbed API
+      // Use the Spotify URI format which is more reliable
+      const spotifyUri = `spotify:${type}:${track.id}`;
+
+      // Create the embed HTML with the URI
+      const embedHtml = `<iframe 
+        src="https://open.spotify.com/embed/${type}/${track.id}?utm_source=generator" 
+        width="100%" 
+        height="352" 
+        frameBorder="0" 
+        allowfullscreen="" 
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+        loading="lazy">
+      </iframe>`;
+
+      // Set the embed HTML and show the embed modal
+      setEmbedHtml(embedHtml);
+      setShowEmbed(true);
+
+      console.log("Spotify embed created for:", spotifyUri);
+    } catch (error: any) {
+      console.error("Error setting up Spotify embed:", error);
+      setError(
+        `Could not load Spotify player for "${track.name}". Please try again.`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Handle mood search
   const handleMoodSearch = async (mood: string) => {
@@ -699,6 +743,26 @@ export default function Dashboard() {
       if (progressInterval) clearInterval(progressInterval);
     };
   }, [isPlaying, currentTrack, seeking]);
+
+  // Handle click outside of embed modal to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        embedRef.current &&
+        !embedRef.current.contains(event.target as Node)
+      ) {
+        setShowEmbed(false);
+      }
+    };
+
+    if (showEmbed) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showEmbed]);
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -923,25 +987,31 @@ export default function Dashboard() {
                     <DiscoverContent
                       recommendations={recommendations}
                       recentlyPlayed={recentlyPlayed}
+                      getSpotifyEmbed={getSpotifyEmbed}
                     />
                   </TabsContent>
                   <TabsContent value="search">
                     <SearchContent
                       spotifyToken={spotifyToken}
                       setRecommendations={setRecommendations}
+                      getSpotifyEmbed={getSpotifyEmbed}
                     />
                   </TabsContent>
                   <TabsContent value="library">
                     <LibraryContent playlists={playlists} />
                   </TabsContent>
                   <TabsContent value="liked">
-                    <LikedContent likedSongs={likedSongs} />
+                    <LikedContent
+                      likedSongs={likedSongs}
+                      getSpotifyEmbed={getSpotifyEmbed}
+                    />
                   </TabsContent>
                   <TabsContent value="ai-mood">
                     <AIMoodContent
                       onMoodSearch={handleMoodSearch}
                       recommendations={recommendations}
                       setRecommendations={setRecommendations}
+                      getSpotifyEmbed={getSpotifyEmbed}
                     />
                   </TabsContent>
                 </Tabs>
@@ -951,25 +1021,31 @@ export default function Dashboard() {
                     <DiscoverContent
                       recommendations={recommendations}
                       recentlyPlayed={recentlyPlayed}
+                      getSpotifyEmbed={getSpotifyEmbed}
                     />
                   )}
                   {activeTab === "search" && (
                     <SearchContent
                       spotifyToken={spotifyToken}
                       setRecommendations={setRecommendations}
+                      getSpotifyEmbed={getSpotifyEmbed}
                     />
                   )}
                   {activeTab === "library" && (
                     <LibraryContent playlists={playlists} />
                   )}
                   {activeTab === "liked" && (
-                    <LikedContent likedSongs={likedSongs} />
+                    <LikedContent
+                      likedSongs={likedSongs}
+                      getSpotifyEmbed={getSpotifyEmbed}
+                    />
                   )}
                   {activeTab === "ai-mood" && (
                     <AIMoodContent
                       onMoodSearch={handleMoodSearch}
                       recommendations={recommendations}
                       setRecommendations={setRecommendations}
+                      getSpotifyEmbed={getSpotifyEmbed}
                     />
                   )}
                 </div>
@@ -1079,43 +1155,94 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Spotify Embed Modal */}
+      {showEmbed && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div
+            ref={embedRef}
+            className="bg-card rounded-lg shadow-lg max-w-md w-full p-4 relative"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2"
+              onClick={() => setShowEmbed(false)}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold">{selectedTrack?.name}</h3>
+              <p className="text-sm text-muted-foreground">
+                {selectedTrack?.artists
+                  ?.map((artist: any) => artist.name)
+                  .join(", ")}
+              </p>
+            </div>
+
+            <div
+              className="spotify-embed w-full"
+              dangerouslySetInnerHTML={{ __html: embedHtml }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// Format time for display
+const formatTime = (ms: number) => {
+  if (isNaN(ms)) return "0:00"; // Handle invalid ms
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+};
+
 function DiscoverContent({
   recommendations,
   recentlyPlayed,
+  getSpotifyEmbed,
 }: {
   recommendations: any[];
   recentlyPlayed: any[];
+  getSpotifyEmbed: (track: any) => void;
 }) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Good afternoon</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <AnimatePresence>
-          {recommendations.slice(0, 6).map((track) => (
+          {recommendations.slice(0, 6).map((track, index) => (
             <motion.div
-              key={track.id}
+              key={`discover-top-${track.id}-${index}`}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              className="bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden flex items-center cursor-pointer"
-              onClick={() => {
-                // Play track
-              }}
+              className="relative bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer group"
+              onClick={() => getSpotifyEmbed(track)}
             >
               <img
                 src={
                   track.album?.images?.[2]?.url ||
                   "/placeholder.svg?height=64&width=64" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
                   "/placeholder.svg"
                 }
                 alt={track.name}
                 className="w-16 h-16 object-cover"
               />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-primary text-primary-foreground rounded-full p-2">
+                  <Play className="h-4 w-4" />
+                </div>
+              </div>
               <div className="p-3">
                 <div className="font-medium truncate">{track.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
@@ -1129,27 +1256,34 @@ function DiscoverContent({
       <h2 className="text-xl font-bold">Made for you</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <AnimatePresence>
-          {recommendations.map((track) => (
+          {recommendations.map((track, index) => (
             <motion.div
-              key={track.id}
+              key={`made-for-you-${track.id}-${index}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer"
-              onClick={() => {
-                // Play track
-              }}
+              className="relative bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer group"
+              onClick={() => getSpotifyEmbed(track)}
             >
               <img
                 src={
                   track.album?.images?.[1]?.url ||
                   "/placeholder.svg?height=200&width=200" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
+                  "/placeholder.svg" ||
                   "/placeholder.svg"
                 }
                 alt={track.name}
                 className="aspect-square w-full object-cover"
               />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-primary text-primary-foreground rounded-full p-2">
+                  <Play className="h-4 w-4" />
+                </div>
+              </div>
               <div className="p-3">
                 <div className="font-medium truncate">{track.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
@@ -1164,27 +1298,34 @@ function DiscoverContent({
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <AnimatePresence>
           {(recentlyPlayed.length > 0 ? recentlyPlayed : recommendations).map(
-            (track) => (
+            (track, index) => (
               <motion.div
-                key={track.id}
+                key={`recently-played-${track.id}-${index}`}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3 }}
-                className="bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer"
-                onClick={() => {
-                  // Play track
-                }}
+                className="relative bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer group"
+                onClick={() => getSpotifyEmbed(track)}
               >
                 <img
                   src={
                     track.album?.images?.[1]?.url ||
                     "/placeholder.svg?height=200&width=200" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
                     "/placeholder.svg"
                   }
                   alt={track.name}
                   className="aspect-square w-full object-cover"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-primary text-primary-foreground rounded-full p-2">
+                    <Play className="h-4 w-4" />
+                  </div>
+                </div>
                 <div className="p-3">
                   <div className="font-medium truncate">{track.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
@@ -1205,9 +1346,11 @@ function DiscoverContent({
 function SearchContent({
   spotifyToken,
   setRecommendations,
+  getSpotifyEmbed,
 }: {
   spotifyToken: string | null;
   setRecommendations: (tracks: any[]) => void;
+  getSpotifyEmbed: (track: any) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -1265,27 +1408,34 @@ function SearchContent({
           <h2 className="text-xl font-bold mb-4">Search Results</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             <AnimatePresence>
-              {searchResults.map((track) => (
+              {searchResults.map((track, index) => (
                 <motion.div
-                  key={track.id}
+                  key={`search-result-${track.id}-${index}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer"
-                  onClick={() => {
-                    // Play track
-                  }}
+                  className="relative bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer group"
+                  onClick={() => getSpotifyEmbed(track)}
                 >
                   <img
                     src={
                       track.album?.images?.[1]?.url ||
                       "/placeholder.svg?height=200&width=200" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                     alt={track.name}
                     className="aspect-square w-full object-cover"
                   />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-primary text-primary-foreground rounded-full p-2">
+                      <Play className="h-4 w-4" />
+                    </div>
+                  </div>
                   <div className="p-3">
                     <div className="font-medium truncate">{track.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
@@ -1409,6 +1559,10 @@ function LibraryContent({ playlists }: { playlists: any[] }) {
                   src={
                     playlist.images?.[0]?.url ||
                     "/placeholder.svg?height=48&width=48" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
                     "/placeholder.svg"
                   }
                   alt={playlist.name}
@@ -1437,34 +1591,47 @@ function LibraryContent({ playlists }: { playlists: any[] }) {
   );
 }
 
-function LikedContent({ likedSongs }: { likedSongs: any[] }) {
+function LikedContent({
+  likedSongs,
+  getSpotifyEmbed,
+}: {
+  likedSongs: any[];
+  getSpotifyEmbed: (track: any) => void;
+}) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Liked Songs</h1>
       {likedSongs.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <AnimatePresence>
-            {likedSongs.map((track) => (
+            {likedSongs.map((track, index) => (
               <motion.div
-                key={track.id}
+                key={`liked-song-${track.id}-${index}`}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3 }}
-                className="bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer"
-                onClick={() => {
-                  // Play track
-                }}
+                className="relative bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer group"
+                onClick={() => getSpotifyEmbed(track)}
               >
                 <img
                   src={
                     track.album?.images?.[1]?.url ||
                     "/placeholder.svg?height=200&width=200" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
+                    "/placeholder.svg" ||
                     "/placeholder.svg"
                   }
                   alt={track.name}
                   className="aspect-square w-full object-cover"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-primary text-primary-foreground rounded-full p-2">
+                    <Play className="h-4 w-4" />
+                  </div>
+                </div>
                 <div className="p-3">
                   <div className="font-medium truncate">{track.name}</div>
                   <div className="text-xs text-muted-foreground truncate">
@@ -1494,10 +1661,12 @@ function AIMoodContent({
   onMoodSearch,
   recommendations,
   setRecommendations,
+  getSpotifyEmbed,
 }: {
   onMoodSearch: (mood: string) => void;
   recommendations: any[];
   setRecommendations: (tracks: any[]) => void;
+  getSpotifyEmbed: (track: any) => void;
 }) {
   const [moodInput, setMoodInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1562,27 +1731,34 @@ function AIMoodContent({
           <h2 className="text-xl font-bold">Recommendations for your mood</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             <AnimatePresence>
-              {recommendations.map((track) => (
+              {recommendations.map((track, index) => (
                 <motion.div
-                  key={track.id}
+                  key={`mood-recommendation-${track.id}-${index}`}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer"
-                  onClick={() => {
-                    // Play track
-                  }}
+                  className="relative bg-card hover:bg-card/80 transition-colors rounded-lg overflow-hidden cursor-pointer group"
+                  onClick={() => getSpotifyEmbed(track)}
                 >
                   <img
                     src={
                       track.album?.images?.[1]?.url ||
                       "/placeholder.svg?height=200&width=200" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
                       "/placeholder.svg"
                     }
                     alt={track.name}
                     className="aspect-square w-full object-cover"
                   />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-primary text-primary-foreground rounded-full p-2">
+                      <Play className="h-4 w-4" />
+                    </div>
+                  </div>
                   <div className="p-3">
                     <div className="font-medium truncate">{track.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
