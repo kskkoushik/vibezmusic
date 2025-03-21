@@ -780,8 +780,8 @@ export default function Dashboard() {
   // Handle logout
   const handleLogout = () => {
     localStorage.removeItem("spotify_token");
-    signOut();
-    router.push("/sign-in");
+
+    router.push("/");
   };
 
   // Fetch data when token is available
